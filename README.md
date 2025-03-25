@@ -1,4 +1,3 @@
-```markdown
 # Mock Clone Analyzer
 
 Mock Clone Analyzer is a command-line tool for analyzing Mockito-based mock usage in Java test code and detecting mock clones.
