@@ -67,4 +67,3 @@ java -jar target/mock-analyzer-1.0-SNAPSHOT-jar-with-dependencies.jar info "C:\j
 - The mock info file (`mockinfo.json`) contains detailed metadata about mock declarations, usage, and stubbing/verification patterns.
 - The clone result file (`clone.json`) contains detected clone groups among mock usages.
 
-```
