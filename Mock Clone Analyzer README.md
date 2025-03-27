@@ -172,7 +172,7 @@ For `testAnalyze()`:
   ```
 
 We then abstract these combinations for comparison, focusing only on the mock-related operations.
-```
+
 
 ### 2. Sequence Abstraction
 
