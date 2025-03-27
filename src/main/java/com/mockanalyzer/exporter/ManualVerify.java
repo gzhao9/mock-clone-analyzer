@@ -1,7 +1,12 @@
 package com.mockanalyzer.exporter;
 
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.github.javaparser.JavaParser;
@@ -13,13 +18,23 @@ import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.github.javaparser.resolution.types.ResolvedType;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.mockanalyzer.model.MockInfo;
+import com.mockanalyzer.model.MockSequences;
 import com.mockanalyzer.visitor.EnhancedProjectResolver;
 
 public class ManualVerify {
     public static void main(String[] args) throws Exception {
-        manualVerifyProcess();
-        manualVerifySolver();
+
+        String projectName = "dubbo";
+
+        verifyOutputSequences("C:\\java tool\\Apache\\" + projectName,
+                "C:\\Users\\10590\\OneDrive - stevens.edu\\PHD\\2025 Spring\\mock clone detection\\mock-clone-analyzer\\Example Test File\\"
+                        + projectName + " sequences.json",
+                false);
+        // manualVerifyProcess();
+        // manualVerifySolver();
     }
 
     private static void manualVerifyProcess() throws Exception {
@@ -37,6 +52,41 @@ public class ManualVerify {
         int lineNumber = 180; // 替换成你想要分析的具体行号
 
         resolveStatement(projectRoot, targetFile, lineNumber, false);
+    }
+
+    private static void verifyOutputSequences(String inputPath, String outputPath, boolean runCommand)
+            throws Exception {
+
+        Path projectRoot = Paths.get(inputPath);
+        // 1. 分析整个项目，得到所有 MockInfo
+        List<MockInfo> combinedResults = MockInfoExporter.analyzeProject(projectRoot, runCommand);
+
+        // 2. 对每个 MockInfo 生成 MockSequences 列表
+        List<MockSequences> allSequences = new ArrayList<>();
+        for (MockInfo mockInfo : combinedResults) {
+            // 如果尚未在 mockInfo 内部进行定位/排序，可按需执行：
+            // mockInfo.statements.sort(Comparator.comparingInt(s -> s.line));
+
+            // 调用你写好的方法，例如：
+            // public List<MockSequences> toMockSequences() { ... }
+            List<MockSequences> seqList = mockInfo.toMockSequences();
+            allSequences.addAll(seqList);
+        }
+
+        // 3. 输出到 JSON
+        Gson gson = new GsonBuilder()
+                .setPrettyPrinting()
+                .disableHtmlEscaping()
+                .create();
+
+        try (OutputStreamWriter writer = new OutputStreamWriter(
+                new FileOutputStream(outputPath), StandardCharsets.UTF_8)) {
+            gson.toJson(allSequences, writer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("Analysis completed. Result -> " + outputPath);
     }
 
     private static void analyzeWithParameters(String inputPath, String outputPath, boolean outCMD, boolean runCommand)

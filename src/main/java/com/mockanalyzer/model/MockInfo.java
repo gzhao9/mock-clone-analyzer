@@ -4,6 +4,7 @@ import java.util.*;
 
 /**
  * 存储 Mock 相关信息
+ * Stores information about a mock object
  */
 
 public class MockInfo {
@@ -14,6 +15,7 @@ public class MockInfo {
     public String mockPattern = "";
 
     // 类上下文
+    // ClassContext
     public ClassContext classContext = new ClassContext();
 
     // locationContext
@@ -161,4 +163,98 @@ public class MockInfo {
         return sb.toString().trim();
     }
 
+    // 以下是一些方法，用于格式化输出
+    // Print the mock sequence in a readable format.
+    public List<MockSequences> toMockSequences() {
+
+        // 1) 标记所有要保留的语句（包括 stubbing/verification + 邻居）
+        // 用行号或直接用引用保存都行，这里用行号
+        Set<Integer> linesToKeep = new HashSet<>();
+
+        // 遍历 statements
+        for (int i = 0; i < statements.size(); i++) {
+            StatementInfo stmt = statements.get(i);
+            stmt.checkLocate();
+            String upperType = stmt.type.toUpperCase();
+
+            // 如果是 STUBBING 或 VERIFICATION，则加上它自己及它的邻居
+            if (!"REFERENCE".equals(upperType)) {
+                linesToKeep.add(stmt.line);
+                linesToKeep.add(stmt.line - 1); // 前一行
+                linesToKeep.add(stmt.line + 1); // 后一行
+            }
+        }
+
+        // 注意：并不是所有语句都需要邻居，比如 CREATION 本身也可能想要保留，但它并不需要把邻居拿进来
+        // 因为你只要求 stubbing / verification 才要邻居
+
+        // 2) 分组：shareable vs. testCase
+        // key = test method name, value=此方法的语句
+        List<StatementInfo> shareableList = new ArrayList<>();
+        Map<String, List<StatementInfo>> testCaseMap = new LinkedHashMap<>();
+
+        for (StatementInfo stmt : statements) {
+            if (isShareableLocate(stmt.locate)) {
+                shareableList.add(stmt);
+            } else if ("Test Case".equals(stmt.locate) && linesToKeep.contains(stmt.line)) {
+                String methodName = stmt.locationContext.methodName;
+                testCaseMap.computeIfAbsent(methodName, k -> new ArrayList<>()).add(stmt);
+            }
+        }
+
+        // 3) 针对每个测试方法，构造一个 MockSequences
+        List<MockSequences> result = new ArrayList<>();
+        for (Map.Entry<String, List<StatementInfo>> entry : testCaseMap.entrySet()) {
+            String testMethodName = entry.getKey();
+            List<StatementInfo> testStmts = entry.getValue();
+
+            // 创建一个新的 MockSequences
+            MockSequences seq = new MockSequences();
+            seq.variableName = this.variableName;
+            seq.variableType = this.variableType;
+            seq.mockedClass = this.mockedClass;
+            seq.packageName = this.classContext.packageName;
+            seq.filePath = this.classContext.filePath;
+            seq.className = this.classContext.className;
+            seq.testMethodName = testMethodName;
+
+            // 3.1) 先处理 shareableList
+            for (StatementInfo s : shareableList) {
+                addToMockSequences(seq, s);
+            }
+
+            // 3.2) 再处理测试方法语句
+            for (StatementInfo s : testStmts) {
+                addToMockSequences(seq, s);
+            }
+
+            result.add(seq);
+        }
+
+        return result;
+    }
+
+    /**
+     * 判断 locate 是否是共享类型
+     */
+    private boolean isShareableLocate(String locate) {
+        // 你可按需扩展
+        return Arrays.asList("Attribute", "@Before", "@After", "Helper Method").contains(locate);
+    }
+
+    /**
+     * 将某条语句放入MockSequences的 map。
+     */
+    private void addToMockSequences(MockSequences seq, StatementInfo stmt) {
+        boolean isShareable = isShareableLocate(stmt.locate);
+        Map<Integer, String> linesMap = isShareable ? seq.shareableMockLines : seq.testMockLines;
+
+        linesMap.put(stmt.line, stmt.code);
+        seq.rawStatementInfo.put(stmt.line, stmt);
+
+        // 如果是 stubbing，放 abstracted
+        if ("STUBBING".equalsIgnoreCase(stmt.type)) {
+            seq.abstractedStatement.put(stmt.line, stmt.abstractedStatement);
+        }
+    }
 }

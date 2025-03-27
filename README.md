@@ -42,6 +42,9 @@ java -jar mock-analyzer-1.0-SNAPSHOT-jar-with-dependencies.jar info <projectRoot
 
 ### Detect Mock Clones
 
+**Want to know how clone detection works?**  
+See [Clonal detection algorithm.md](Clonal detection algorithm.md) for the detailed algorithm, examples, and LOC-saving strategy used by the mock clone analyzer.
+
 You can run clone detection in two ways:
 
 **1. Using an existing mockinfo.json file:**
