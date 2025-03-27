@@ -333,18 +333,6 @@ The algorithm identifies these optimal patterns to extract:
 
 This minimizes code duplication while maintaining test clarity.
 
-## Using the Analyzer
-
-The Mock Clone Analyzer tool automates this process:
-
-1. Analyzes Java test code to extract mock usage
-2. Abstracts mock sequences into comparable patterns
-3. Identifies common patterns using sequence mining
-4. Suggests optimal refactoring strategies
-5. Estimates lines of code that can be saved
-
-For detailed usage instructions, see the [Tool Usage](#requirements) section above.
-
 ## Evaluation Results
 
 We evaluated our clone detection algorithm on two major open-source Java projects:
