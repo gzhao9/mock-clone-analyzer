@@ -1,109 +1,133 @@
-## 1. Mock Clone Overview (Partial Overlap Scenario)
 
-When you use **Mockito** to write tests, you might have repeated lines that create a mock object and then set certain stubs:
 
+
+# Mock Clones in Unit Tests
+
+### Definition
+**Mock clones** are repeated mock creation and stubbing code patterns across test methods. They represent a special form of code duplication unique to test code.
+
+### Example
 ```java
-MyService s = Mockito.mock(MyService.class);
-when(s.doA("A")).thenReturn("someReturn");
-when(s.doB("B")).thenReturn("bReturn");
-// Possibly more stubbing...
+// Appears in multiple test methods
+MyService service = Mockito.mock(MyService.class);
+when(service.doA("A")).thenReturn("resultA");
+when(service.doB("B")).thenReturn("resultB");
 ```
 
-Sometimes, the stubs are **not all** the same. For instance, some tests also stub `doC("C")`, or `doD("D")`. But **part** of the stubbing is still identical—maybe you always stub `"A"`, but only half the tests also stub `"B"`. This means you can refactor out the **common lines** into a helper method, and then have each test do its **additional** stubs afterward:
+### Problem
+- Test maintenance becomes costly as changes must be applied to all clones
+- Traditional clone detectors typically miss these patterns
+- Tests with partial mock setup differences (some methods stub `doC`, others don't) create **partial mock clones**
+
+### Solution
+We propose an algorithm that:
+1. Detects partial mock clones by identifying frequent sub-sequences in mock setup code
+2. Applies a greedy optimization process to maximize code reuse
+3. Automatically refactors the clones into reusable test fixtures
+
+This approach reduces test maintenance costs and improves test readability.
+
+
+# Mock Clone Detection Algorithm 
+
+### Step 1: Collect Mock Sequences
+
+In each test method, we collect the mock creation and stubbing statements for every mock object and represent them as a mock sequence:
+
+```text
+Mi = {s1, s2, ..., sk}
+```
+
+For example, two tests may contain the following mock setup sequences:
+
+- `M1 = {s1, s2, s3}`
+- `M2 = {s2, s3, s4}`
+
+Each `si` is an abstracted statement such as:
 
 ```java
-// A shared partial method:
+s2: when(s.doA("A")).thenReturn("resultA");
+s3: when(s.doB("B")).thenReturn("resultB");
+```
+
+In this case, the sub-sequence `{s2, s3}` is shared between `M1` and `M2`.
+
+**Verification statements are excluded**, as they tend to be assertion-specific and do not reflect reusable setup logic.
+
+---
+
+### Step 2: Mine Frequent Sub-sequences
+
+We apply frequent pattern mining (e.g., **Apriori** or **FP-Growth**) to the collection `M = {M1, M2, ..., Mn}` and extract repeated sub-sequences:
+
+- In the example above, `E1 = {s2, s3}` would be identified as a frequent sub-sequence appearing in both `M1` and `M2`.
+
+Such repeated sub-sequences can then be extracted into a shared helper method:
+
+```java
 private MyService getBaseMock() {
     MyService s = Mockito.mock(MyService.class);
-    when(s.doA("A")).thenReturn("someReturn");  // common stub
+    when(s.doA("A")).thenReturn("resultA");
+    when(s.doB("B")).thenReturn("resultB");
     return s;
 }
-
-// In one test:
-MyService s = getBaseMock();
-when(s.doB("B")).thenReturn("bReturn");  // test-specific stubbing
-
-// In another test:
-MyService s = getBaseMock();
-when(s.doC("C")).thenReturn("cReturn");  // different test-specific stubbing
 ```
 
-Thus, you only **clone** the lines that are truly repeated in multiple tests. Our goal is to **automate** finding these partial overlaps (common subsequences). We do so by:
+Each test can call this helper and add its own test-specific stubs as needed.
 
-1. Collecting each test’s **mock sequence** (the lines that create and stub a particular mock).  
-2. Using **Apriori** or **FP-Growth** to detect repeated sub-sequences.  
-3. **Greedily assigning** each mock sequence to the “best” repeated sub-sequence, possibly adding leftover stubs by hand.
 
----
 
-## 2. A Simple Look at Apriori/FP-Growth
+### Step 3: Sort Candidates by Potential Benefit
 
-- **Apriori** and **FP-Growth** are data-mining algorithms originally used for “shopping-basket” analysis. Each basket (or “transaction”) might contain items like {milk, bread, eggs}.  
-- Here, **each mock sequence** plays the role of a “basket,” containing lines like `{mock creation, stub A, stub B}`.  
-- Apriori systematically enumerates possible sub-sets (or sub-sequences) and keeps only those that appear in many baskets. FP-Growth uses a special tree structure to do this more efficiently.  
-- The result is a set of **frequent sub-sequences** that appear in at least some threshold number of mock sequences. For instance, “mock creation + stub A” might appear in 10 tests, making it a common pattern.
-
----
-
-## 3. Key Symbols and Meanings
-
-1. \(\mathcal{M} = \{M_1, M_2, \dots, M_n\}\)  
-   - Our **mock sequence** set. Each \(M_i\) is one test’s lines for a particular mock object. Example:
-     \[
-       M_1 = \{\texttt{mockCreation}, \texttt{stub(A)}, \texttt{stub(B)}\}.
-     \]
-
-2. \(\mathcal{E} = \{E_1, E_2, \dots, E_k\}\)  
-   - The collection of **frequent stubbing sub-sequences** found by Apriori/FP-Growth.  
-   - Example: \(E_2 = \{\texttt{mockCreation}, \texttt{stub(A)}\}\) if that pair is repeated across many tests.
-
-3. \(C(E_j)\subseteq \mathcal{M}\)  
-   - The set of mock sequences in which \(E_j\) appears (i.e., all tests that contain that sub-sequence).
-
-4. **LOC Reduction (Gain) Formula**  
-   \[
-     \text{LOC Gain}
-     = \sum_{j} \Bigl[\lvert E_j\rvert \times \bigl(\lvert C(E_j)\rvert -1\bigr)\Bigr].
-   \]
-   - \(\lvert E_j\rvert\): how many lines (stubs) are in sub-sequence \(E_j\).  
-   - \(\lvert C(E_j)\rvert\): how many mock sequences it covers.  
-   - If \(E_j\) only covers 1 mock sequence, it yields 0 net savings.
+- Sort each `Ej` by the potential LOC savings:
+  ```
+  Priority Score = |Ej| × (|C(Ej)| - 1)
+  ```
+  where:
+  - `|Ej|`: length of the sub-sequence (number of statements),
+  - `|C(Ej)|`: number of mock sequences it covers,
+  - Subtracting 1 accounts for the fact that only repeated occurrences reduce duplication.
 
 ---
 
-## 4. The Greedy Algorithm (Step by Step)
+### Step 4: Greedy Assignment of Mock Sequences
 
-### A. Candidate Extraction
-1. **Collect mock sequences** \(\{M_i\}\) from your tests.  
-2. **Run Apriori or FP-Growth** to get frequent sub-sequences \(\{E_j\}\).  
-3. Compute \(C(E_j)\), the set of mock sequences each \(E_j\) covers.
+We apply a greedy strategy to assign each mock sequence to the best-matching sub-sequence, based on local priority, without considering long-term or global effects. This makes the algorithm efficient but potentially suboptimal, which is later addressed via multiple runs.
 
-### B. Sort Sub-sequences
-1. All sub-sequences \(\{E_j\}\) are **sorted** (often descending by `|E_j|*(|C(E_j)|-1)`) to prioritize those likely to save the most lines.
+- Initialize all `Mi` as **unassigned**.
+- For each `Mi`, do:
+  1. Find all `Ej` such that `Ej ⊆ Mi` (i.e., `Ej` is a subset of `Mi`)
+  2. If only one `Ej` matches, assign `Mi` to it.
+  3. If multiple `Ej` match and have equal or similar priority, **break ties randomly**.
+  4. Mark `Mi` as assigned once it’s covered.
 
-### C. Greedy Assignment (with Random Tie-Breaks)
-- For each **unassigned** mock sequence \(M_i\):
-  1. Find all \(E_j\) such that \(M_i \in C(E_j)\) (i.e., \(E_j\) is contained in \(M_i\)).  
-  2. If none can cover \(M_i\), skip.  
-  3. If exactly one can cover \(M_i\), assign \(M_i\) to that \(E_j\).  
-  4. If multiple sub-sequences share the same priority, pick one randomly.  
-  5. Mark \(M_i\) assigned.
+---
 
-### D. Dynamic Cleanup
-1. If any sub-sequence \(E_j\) ends up covering only 1 mock sequence (\(\lvert C(E_j)\rvert=1\)), it yields no duplication savings; **remove** it.  
-2. The sequence that was covered by it returns to “unassigned,” so it can be matched to something else.  
-3. Repeat assignment until stable.
+### Step 5: Dynamic Cleanup and Reassignment
 
-### E. Stopping and Final Calculation
-- When no more changes occur, compute  
-  \[
-    \sum_{j} \Bigl[\lvert E_j\rvert \times (\lvert C(E_j)\rvert -1)\Bigr].
-  \]
-- That’s your **LOC saved** for this **one run**.
+- For each `Ej`:
+  - If `|C(Ej)| = 1` (covers only one `Mi`), **remove** it — it doesn’t reduce duplication.
+  - Mark the corresponding `Mi` as **unassigned**.
+- Go back to **Step 4** and reassign released sequences.
+- Repeat until no more low-coverage `Ej` exist — i.e., the process has **converged**.
 
-### F. Multiple Runs
-- Because you **randomly break ties**, different runs can produce different coverage sets.  
-- **Repeat** the entire process multiple times, picking the run that yields the highest final LOC savings.
+---
+
+### Step 6: Compute LOC Savings
+
+- Once assignments are stable, compute total saved lines of code:
+  ```
+  LOC_Gain = ∑ [ |Ej| × (|C(Ej)| - 1) ]
+  ```
+  This measures how many lines can be factored out across shared mock setups.
+
+---
+
+### Step 7: Multiple Runs to Avoid Local Optima
+
+- Because tie-breaks are random, different runs may yield different results.
+- Run the algorithm **multiple times** (e.g., 100 iterations), each with a different random seed.
+- Select the run that achieves the **highest total LOC gain** — this approximates the global optimum and avoids being stuck in suboptimal assignment paths.
 
 ---
 
@@ -115,86 +139,77 @@ Below is a contrived but concrete scenario to illustrate partial overlaps:
 
 We have four mock sequences, each with some “creation” line plus different stubs:
 
-- \(M_1 = \{\texttt{mC},\; \texttt{sA},\; \texttt{sB}\}\)
+1. `M1 = { mC, sA, sB }`
 
-  ```java
-  MyService s = Mockito.mock(MyService.class);  // mC
-  when(s.doA("A")).thenReturn("someReturn");    // sA
-  when(s.doB("B")).thenReturn("bReturn");       // sB
-  ```
+   ```java
+   MyService s = Mockito.mock(MyService.class);  // mC
+   when(s.doA("A")).thenReturn("someReturn");    // sA
+   when(s.doB("B")).thenReturn("bReturn");       // sB
+   ```
 
-- \(M_2 = \{\texttt{mC},\; \texttt{sA},\; \texttt{sC}\}\)
+2. `M2 = { mC, sA, sC }`
 
-  ```java
-  MyService s = Mockito.mock(MyService.class);  // mC
-  when(s.doA("A")).thenReturn("someReturn");    // sA
-  when(s.doC("C")).thenReturn("cReturn");       // sC
-  ```
+   ```java
+   MyService s = Mockito.mock(MyService.class);  // mC
+   when(s.doA("A")).thenReturn("someReturn");    // sA
+   when(s.doC("C")).thenReturn("cReturn");       // sC
+   ```
 
-- \(M_3 = \{\texttt{mC},\; \texttt{sD}\}\)
+3. `M3 = { mC, sD }`
 
-  ```java
-  MyService s = Mockito.mock(MyService.class);  // mC
-  when(s.doD("D")).thenReturn("dReturn");       // sD
-  ```
+   ```java
+   MyService s = Mockito.mock(MyService.class);  // mC
+   when(s.doD("D")).thenReturn("dReturn");       // sD
+   ```
 
-- \(M_4 = \{\texttt{mC},\; \texttt{sB},\; \texttt{sC}\}\)
+4. `M4 = { mC, sB, sC }`
 
-  ```java
-  MyService s = Mockito.mock(MyService.class);  // mC
-  when(s.doB("B")).thenReturn("bReturn");       // sB
-  when(s.doC("C")).thenReturn("cReturn");       // sC
-  ```
+   ```java
+   MyService s = Mockito.mock(MyService.class);  // mC
+   when(s.doB("B")).thenReturn("bReturn");       // sB
+   when(s.doC("C")).thenReturn("cReturn");       // sC
+   ```
 
 ### 5.2. Frequent Sub-sequences
 
-Imagine Apriori/FP-Growth yields the following:
+Imagine Apriori/FP-Growth yields:
 
-1. \(E_1=\{\texttt{mC}\}\).  
-   - Appears in all four sequences (\(\{M_1, M_2, M_3, M_4\}\)).  
-2. \(E_2=\{\texttt{mC}, \texttt{sA}\}\).  
-   - Appears in \(M_1, M_2\).  
-3. \(E_3=\{\texttt{mC}, \texttt{sB}\}\).  
-   - Appears in \(M_1, M_4\).  
-4. \(E_4=\{\texttt{mC}, \texttt{sC}\}\).  
-   - Appears in \(M_2, M_4\).  
-5. \(E_5=\{\texttt{mC}, \texttt{sD}\}\).  
-   - Appears in \(M_3\) only (so \(|C(E_5)|=1\) for now).
-
-(**Note**: These sub-sequences reflect the partial overlap—some share the creation line `mC` plus a different stub, some only appear in 2 sequences, and so on.)
+- `E1 = { mC }`  
+  Covers `{M1, M2, M3, M4}`.  
+- `E2 = { mC, sA }`  
+  Covers `{M1, M2}`.  
+- `E3 = { mC, sB }`  
+  Covers `{M1, M4}`.  
+- `E4 = { mC, sC }`  
+  Covers `{M2, M4}`.  
+- `E5 = { mC, sD }`  
+  Covers `{M3}` only (so `|C(E5)|=1` for now).
 
 ### 5.3. Step-by-Step Possible Run
 
-We sort sub-sequences by \(\lvert E_j\rvert \times (\lvert C(E_j)\rvert -1)\):
+We sort them by `|Ej| * (|C(Ej)| - 1)`:
 
-- \(E_1\): length = 1, covers 4 mock sequences => potential = \(1*(4-1)=3\).  
-- \(E_2\): length = 2, covers 2 => potential = \(2*(2-1)=2\).  
-- \(E_3\): length = 2, covers 2 => potential = \(2*(2-1)=2\).  
-- \(E_4\): length = 2, covers 2 => potential = 2.  
-- \(E_5\): length = 2, covers 1 => potential = 0.
+- `E1`: length = 1, covers 4 → potential = `1 * (4 - 1) = 3`.  
+- `E2`: length = 2, covers 2 → potential = `2 * (2 - 1) = 2`.  
+- `E3`: length = 2, covers 2 → potential = `2`.  
+- `E4`: length = 2, covers 2 → potential = `2`.  
+- `E5`: length = 2, covers 1 → potential = `0`.
 
-1. **Assign \(M_1\)**  
-   - Covers: \(E_1, E_2, E_3\).  
-   - Highest potential so far might be \(E_1=3\) vs. \(E_2=2\) vs. \(E_3=2\). So we might pick **\(E_1\)** for \(M_1\). Now \(E_1\) covers \(\{M_1\}\).  
-2. **Assign \(M_2\)**  
-   - Covers: \(E_1, E_2, E_4\).  
-   - If \(E_1\) still has the highest potential (3), we might pick it again. So now \(E_1\) covers \(\{M_1, M_2\}\).  
-3. **Assign \(M_3\)**  
-   - Covers: \(E_1, E_5\).  
-   - \(E_1\) still 3 potential, \(E_5\) is effectively 0 if it only covers 1. So we pick \(E_1\). Now \(E_1\) covers \(\{M_1, M_2, M_3\}\).  
-4. **Assign \(M_4\)**  
-   - Covers: \(E_1, E_3, E_4\). Possibly we choose \(E_1\) again. Then \(E_1\) covers \(\{M_1, M_2, M_3, M_4\}\).  
+1. **Assign M1**  
+   - Candidates: `E1, E2, E3`.  
+   - `E1=3`, `E2=2`, `E3=2`. Pick `E1`; now `E1` covers `{M1}`.  
+2. **Assign M2**  
+   - Candidates: `E1, E2, E4`. If `E1` is still 3, we pick `E1`; now `E1` covers `{M1, M2}`.  
+3. **Assign M3**  
+   - Candidates: `E1, E5`. `E1=3`, `E5=0`. Choose `E1`; now `E1` covers `{M1, M2, M3}`.  
+4. **Assign M4**  
+   - Candidates: `E1, E3, E4`. Possibly choose `E1` again; it covers `{M1, M2, M3, M4}`.
 
-**Final coverage**: \(E_1\) has length=1 and covers 4 sequences => actual lines saved = \(1*(4-1)=3\).  
-
-- The other sub-sequences might cover none, or just 1.  
-- That yields total of 3 lines saved.
+So `E1` length=1 covers 4 sequences → actual lines saved = `1 * (4 - 1) = 3`. Others might cover none or remain with coverage=1. Total = 3.
 
 ### 5.4. Another Run (With Different Choices)
 
-If, for instance, we **randomly** decided at \(M_2\) to pick \(E_2\) (the “mC + sA” pattern), then \(E_2\) would cover \(\{M_1, M_2\}\). Meanwhile, we could assign \(M_4\) to \(E_4\) = {mC, sC}, covering \(\{M_2, M_4\}\), etc. Potentially, these combos might produce a higher sum if they cover multiple sets with length≥2.  
-
-Hence, we see the advantage of **random tie-breaking** and **multiple runs**—some final combos can cover more sequences with bigger sub-sequences, thus increasing the total lines saved. Meanwhile, any stubs not covered by that partial pattern can be added manually in each test.
+If we **randomly** pick `E2` for `M2` instead, or if we try to use `E3` and `E4` for `M4`, we might produce a higher total. This is why multiple runs can be beneficial.
 
 ---
 
@@ -206,4 +221,6 @@ By focusing on **partial overlaps**:
 2. **Apriori/FP-Growth** detects sub-sequences that appear in multiple tests (like “mock creation + stub(A)”).  
 3. We run a **greedy assignment** to see how best to group each mock sequence under a repeated sub-sequence, while acknowledging that leftover stubs can be done individually.  
 4. We handle tie situations **randomly**, allowing multiple runs to find better coverage.  
-5. In the end, we refactor out the most common overlapping lines into a helper method, thus **reducing duplication** while letting each test add the unique stubs it needs.
+5. We refactor out the most common overlapping lines into a helper method, thus **reducing duplication** while letting each test add the unique stubs it needs.
+
+This approach systematically identifies repeated fragments—whether fully identical or partially shared—and helps keep tests more maintainable and concise.

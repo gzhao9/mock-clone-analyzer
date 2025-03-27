@@ -165,7 +165,7 @@ public class MockInfo {
 
     // 以下是一些方法，用于格式化输出
     // Print the mock sequence in a readable format.
-    public List<MockSequences> toMockSequences() {
+    public List<MockSequence> toMockSequences() {
 
         // 1) 标记所有要保留的语句（包括 stubbing/verification + 邻居）
         // 用行号或直接用引用保存都行，这里用行号
@@ -203,13 +203,13 @@ public class MockInfo {
         }
 
         // 3) 针对每个测试方法，构造一个 MockSequences
-        List<MockSequences> result = new ArrayList<>();
+        List<MockSequence> result = new ArrayList<>();
         for (Map.Entry<String, List<StatementInfo>> entry : testCaseMap.entrySet()) {
             String testMethodName = entry.getKey();
             List<StatementInfo> testStmts = entry.getValue();
 
             // 创建一个新的 MockSequences
-            MockSequences seq = new MockSequences();
+            MockSequence seq = new MockSequence();
             seq.variableName = this.variableName;
             seq.variableType = this.variableType;
             seq.mockedClass = this.mockedClass;
@@ -245,7 +245,7 @@ public class MockInfo {
     /**
      * 将某条语句放入MockSequences的 map。
      */
-    private void addToMockSequences(MockSequences seq, StatementInfo stmt) {
+    private void addToMockSequences(MockSequence seq, StatementInfo stmt) {
         boolean isShareable = isShareableLocate(stmt.locate);
         Map<Integer, String> linesMap = isShareable ? seq.shareableMockLines : seq.testMockLines;
 

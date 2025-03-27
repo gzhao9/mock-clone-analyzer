@@ -4,7 +4,7 @@ Mock Clone Analyzer is a command-line tool for analyzing Mockito-based mock usag
 
 ## Requirements
 
-- Java 17 or higher
+- Java 17 or higher  
 - Maven 3.6 or higher
 
 ## Build Instructions
@@ -29,44 +29,52 @@ java -jar mock-analyzer-1.0-SNAPSHOT-jar-with-dependencies.jar <command> <args..
 
 ### Export Mock Information
 
-This mode analyzes a Java project and exports mock-related information in JSON format.
+Analyze a Java project and export raw mock information, including mock creation and usage metadata:
 
 ```bash
 java -jar mock-analyzer-1.0-SNAPSHOT-jar-with-dependencies.jar info <projectRoot> <outputFile> [--skip]
 ```
 
-- `<projectRoot>`: Path to the root directory of the Java project to analyze.
-- `<outputFile>`: Path to the output JSON file.
-- `--skip` (optional): Skips the build step (`mvn compile` or `gradle build`). Recommended after the first run if the symbol resolver has already been initialized.
+- `<projectRoot>`: Path to the root directory of the Java project to analyze  
+- `<outputFile>`: Path to the output JSON file (e.g., `mockinfo.json`)  
+- `--skip` (optional): Skips the build step (`mvn compile` or `gradle build`)  
 
+### Export Mock Sequences
+
+This mode outputs abstracted mock sequences used in test cases, preparing input for clone detection:
+
+```bash
+java -jar mock-analyzer-1.0-SNAPSHOT-jar-with-dependencies.jar sequence <projectRoot> <outputFile> [--skip]
+```
+
+- The output file (e.g., `sequences.json`) contains a list of all mock usage sequences with test context and abstracted statements.
 
 ### Detect Mock Clones
 
-**Want to know how clone detection works?**  
-See [Clonal detection algorithm.md](Clonal detection algorithm.md) for the detailed algorithm, examples, and LOC-saving strategy used by the mock clone analyzer.
+> **Want to know how clone detection works?**  
+> See [Clonal detection algorithm](Clonal%20detection%20algorithm.md) for the detailed algorithm, examples, and LOC-saving strategy used by the mock clone analyzer.
 
-You can run clone detection in two ways:
+Run clone detection in one of the following ways:
 
-**1. Using an existing mockinfo.json file:**
-
-```bash
-java -jar mock-analyzer-1.0-SNAPSHOT-jar-with-dependencies.jar clone <mockinfo.json> <outputCloneFile>
-```
-
-**2. Directly from a project directory:**
+**1. Directly from a project directory:**
 
 ```bash
 java -jar mock-analyzer-1.0-SNAPSHOT-jar-with-dependencies.jar clone <projectRoot> <outputCloneFile> [--skip]
 ```
 
+**2. From an existing mockinfo.json file:**  
+(Currently not supported via CLI, but can be integrated manually using `MockCloneDetector` API.)
+
 ## Example
 
 ```bash
 java -jar target/mock-analyzer-1.0-SNAPSHOT-jar-with-dependencies.jar info "C:\java tool\Apache\dubbo" "output/dubbo.json"
+java -jar target/mock-analyzer-1.0-SNAPSHOT-jar-with-dependencies.jar sequence "C:\java tool\Apache\dubbo" "output/dubbo-sequences.json"
+java -jar target/mock-analyzer-1.0-SNAPSHOT-jar-with-dependencies.jar clone "C:\java tool\Apache\dubbo" "output/dubbo-clone.json"
 ```
 
 ## Output Files
 
-- The mock info file (`mockinfo.json`) contains detailed metadata about mock declarations, usage, and stubbing/verification patterns.
-- The clone result file (`clone.json`) contains detected clone groups among mock usages.
-
+- `mockinfo.json`: Raw metadata for all mock objects, including declaration and usage context  
+- `sequences.json`: Abstracted mock usage sequences grouped by test case  
+- `clone.json`: Detected mock clone groups, with reusable mock patterns and LOC savings estimates
