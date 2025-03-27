@@ -125,7 +125,7 @@ public class AprioriMiner {
             List.of("s2", "s3", "s4"),
             List.of("s2", "s4", "s5"),
             List.of("s1", "s4"),
-            List.of("s1", "s2","s4","s6", "s5")
+            List.of("s1", "s6")
         );
 
         // Should see itemsets like {s2, s3}, {s2, s4}, {s1, s4}, etc.

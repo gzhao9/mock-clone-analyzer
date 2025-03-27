@@ -313,25 +313,53 @@ public void test2() {
 }
 ```
 
-## Optimizing Refactoring with Pattern Mining
+### Clone Detection with Apriori and Greedy Strategy
 
-For complex cases with multiple overlapping patterns, we use a combination of the Apriori algorithm and a greedy approach to find optimal refactoring opportunities.
+In scenarios involving multiple mock objects and overlapping stubbing patterns, we apply a two-step strategy to detect optimal refactoring opportunities. 
+    
+- First, we use the **Apriori algorithm** to identify all frequent subsets of abstracted stubbing statements that appear in multiple mock sequences. 
+- Then, we apply a **greedy selection algorithm** to group mocks into clone instances that maximize coverage and minimize redundancy.
 
-Consider this example with multiple mock objects and stubbing patterns:
+Consider the following mock sequences, where each list represents the stubs (abstracted as `s1`, `s2`, etc.) associated with a mock object:
 
 ```
-MockObject1 = {"getData()", "getStatus()", "getOwner()"}
-MockObject2 = {"getStatus()", "getOwner()", "getPriority()"}
-MockObject3 = {"getStatus()", "getPriority()", "getType()"}
-MockObject4 = {"getData()", "getPriority()"}
-MockObject5 = {"getData()", "getEnvironment()"}
+MO1: [s1, s2, s3]  
+MO2: [s2, s3, s4]  
+MO3: [s2, s4, s5]  
+MO4: [s1, s4]  
+MO5: [s1, s6]
 ```
 
-The algorithm identifies these optimal patterns to extract:
-1. Pattern A = {"getData()"} → appears in objects 1, 4, 5
-2. Pattern B = {"getStatus()", "getPriority()"} → appears in objects 2, 3
+For example, if `MO1` has stubbing calls like:
 
-This minimizes code duplication while maintaining test clarity.
+```java
+when(service.getData()).thenReturn(...);
+when(service.getStatus()).thenReturn(...);
+when(service.getOwner()).thenReturn(...);
+```
+
+These would be abstracted to `s1`, `s2`, and `s3`, respectively.
+
+The Apriori algorithm processes the above sequences and finds all subsets that appear in at least two mock objects:
+
+```
+[s1]       → [MO1, MO4, MO5]  
+[s2]       → [MO1, MO2, MO3]  
+[s3]       → [MO1, MO2]  
+[s4]       → [MO2, MO3, MO4]  
+[s2, s3]   → [MO1, MO2]  
+[s2, s4]   → [MO2, MO3]
+```
+
+Based on the frequency and coverage of these patterns, a greedy algorithm selects the most beneficial combinations to form clone instances. The goal is to maximize the number of mocks covered with minimal overlap.
+
+The resulting clone instances are:
+
+- **Instance A**: Pattern `{s1}`, shared by MO1, MO4, and MO5  
+- **Instance B**: Pattern `{s2, s4}`, shared by MO2 and MO3
+
+This strategy minimizes redundant stubbing logic while preserving the clarity and maintainability of the test code.
+
 
 ## Evaluation Results
 
