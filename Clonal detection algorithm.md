@@ -6,13 +6,56 @@
 ### Definition
 **Mock clones** are repeated mock creation and stubbing code patterns across test methods. They represent a special form of code duplication unique to test code.
 
-### Example
+### Standard Mocking Pattern
+
+A typical mock usage follows this pattern:
+
 ```java
-// Appears in multiple test methods
-MyService service = Mockito.mock(MyService.class);
-when(service.doA("A")).thenReturn("resultA");
-when(service.doB("B")).thenReturn("resultB");
+// Creation - Create a mock object
+Service mockService = mock(Service.class);
+
+// Stubbing - Configure the mock behavior
+when(mockService.getData()).thenReturn("test data");
+when(mockService.getStatus()).thenReturn(Status.ACTIVE);
+
+// Test execution
+systemUnderTest.process(mockService);
+
+// Verification - Verify the mock was used as expected
+verify(mockService).logAccess();
 ```
+### The Problem: Duplicate Mock Configurations
+
+Consider these two test methods:
+
+```java
+@Test
+public void testProcess() {
+    // Creation
+    Service mockService = mock(Service.class);
+    
+    // Stubbing
+    when(mockService.getData()).thenReturn("test data");
+    when(mockService.getStatus()).thenReturn(Status.ACTIVE);
+    
+    systemUnderTest.process(mockService);
+    verify(mockService).logAccess();
+}
+
+@Test
+public void testAnalyze() {
+    // Same mock creation and stubbing repeated
+    Service mockService = mock(Service.class);
+    when(mockService.getData()).thenReturn("test data");
+    when(mockService.getStatus()).thenReturn(Status.ACTIVE);
+    when(mockService.getMode()).thenReturn(Mode.ANALYSIS);
+    
+    systemUnderTest.analyze(mockService);
+    verify(mockService).logAccess();
+}
+```
+
+The mock creation and some stubbing code is duplicated, creating a "mock clone."
 
 ### Problem
 - Test maintenance becomes costly as changes must be applied to all clones
@@ -27,6 +70,78 @@ We propose an algorithm that:
 
 This approach reduces test maintenance costs and improves test readability.
 
+### Preprocessing Steps
+
+Before applying the algorithm, we perform two preprocessing steps:
+
+#### 1. Categorizing Mock Statements
+
+Mock statements are classified into two types:
+- **Shareable mock lines**: Code in `@Before` methods, attributes, or helper methods.
+- **Test-specific mock lines**: Code within individual test methods.
+
+Example:
+```java
+public class ServiceTest {
+  // Shareable (attribute)
+  private Service mockService = mock(Service.class);
+
+  @Before
+  public void setup() {
+    // Shareable (@Before)
+    when(mockService.getEnvironment()).thenReturn("test");
+  }
+
+  @Test
+  public void testProcess() {
+    // Test-specific (local)
+    when(mockService.getData()).thenReturn("test data");
+    systemUnderTest.process(mockService);
+  }
+
+  @Test
+  public void testAnalyze() {
+    // Test-specific (local)
+    when(mockService.getData()).thenReturn("test data");
+    when(mockService.getMode()).thenReturn(Mode.ANALYSIS);
+    systemUnderTest.analyze(mockService);
+  }
+}
+```
+
+For clone detection, we combine shareable and test-specific lines for each test method. For example:
+
+- **`testProcess()` combined sequence:**
+  ```java
+  private Service mockService = mock(Service.class);
+  when(mockService.getEnvironment()).thenReturn("test");
+  when(mockService.getData()).thenReturn("test data");
+  systemUnderTest.process(mockService); // (non-mock line)
+  ```
+
+- **`testAnalyze()` combined sequence:**
+  ```java
+  private Service mockService = mock(Service.class);
+  when(mockService.getEnvironment()).thenReturn("test");
+  when(mockService.getData()).thenReturn("test data");
+  when(mockService.getMode()).thenReturn(Mode.ANALYSIS);
+  systemUnderTest.analyze(mockService); // (non-mock line)
+  ```
+
+#### 2. Abstracting Mock Sequences
+
+Mocking styles are normalized into a unified representation for comparison. For example:
+
+```java
+// Different syntaxes:
+Mockito.when(moduleDeployer.isRunning()).thenReturn(true);
+given(mockDep.isRunning()).willReturn(false);
+
+// Abstracted representation:
+"when(org.apache.dubbo.common.deploy.ModuleDeployer.isRunning()).thenReturn(boolean)"
+```
+
+This abstraction ensures consistent comparison across different mocking styles.
 
 # Mock Clone Detection Algorithm 
 
@@ -129,7 +244,7 @@ We apply a greedy strategy to assign each mock sequence to the best-matching sub
 
 - Once assignments are stable, compute total saved lines of code:
   ```
-  LOC_Gain = ∑ [ |Ej| × (|C(Ej)| - 1) ]
+  LOC_Reduction = ∑ [ |Ej| × (|C(Ej)| - 1) ]
   ```
   This measures how many lines can be factored out across shared mock setups.
 
@@ -139,100 +254,107 @@ We apply a greedy strategy to assign each mock sequence to the best-matching sub
 
 - Because tie-breaks are random, different runs may yield different results.
 - Run the algorithm **multiple times** (e.g., 100 iterations), each with a different random seed.
-- Select the run that achieves the **highest total LOC gain** — this approximates the global optimum and avoids being stuck in suboptimal assignment paths.
+- Select the run that achieves the **highest total LOC Reduction** — this approximates the global optimum and avoids being stuck in suboptimal assignment paths.
 
 ---
+## Clone Refactoring Strategies
 
-## 5. Detailed Example (Partial Overlaps)
+Based on the mock clone instance we detect, we suggest two main refactoring strategies:
 
-Below is a contrived but concrete scenario to illustrate partial overlaps:
+### 1. Reusable Helper Methods for Frequent Sub-sequences
 
-### 5.1. Mock Sequences
+When we find common stubbing Frequent Sub-sequences, we recommend extracting them to helper methods:
 
-We have four mock sequences, each with some “creation” line plus different stubs:
+**Before refactoring:**
+```java
+@Test
+public void test1() {
+    Service mockService = mock(Service.class);
+    when(mockService.getData()).thenReturn("data");
+    when(mockService.getStatus()).thenReturn(Status.ACTIVE);
+    when(mockService.getOwner()).thenReturn("user1");
+    // test code
+}
 
-1. `M1 = { mC, sA, sB }`
+@Test
+public void test2() {
+    Service mockService = mock(Service.class);
+    when(mockService.getData()).thenReturn("data");
+    when(mockService.getStatus()).thenReturn(Status.ACTIVE);
+    when(mockService.getPriority()).thenReturn(1);
+    // different test code
+}
+```
+The  Frequent Sub-sequences is:
+```java
+    when(mockService.getData()).thenReturn("data");
+    when(mockService.getStatus()).thenReturn(Status.ACTIVE);
+    when(mockService.getPriority()).thenReturn(1);
+```
+**After refactoring:**
+```java
+// Helper method for common stubbing
+private Service createBasicMockService() {
+    Service mockService = mock(Service.class);
+    when(mockService.getData()).thenReturn("data");
+    when(mockService.getStatus()).thenReturn(Status.ACTIVE);
+    return mockService;
+}
 
-   ```java
-   MyService s = Mockito.mock(MyService.class);  // mC
-   when(s.doA("A")).thenReturn("someReturn");    // sA
-   when(s.doB("B")).thenReturn("bReturn");       // sB
-   ```
+@Test
+public void test1() {
+    Service mockService = createBasicMockService();
+    when(mockService.getOwner()).thenReturn("user1");
+    // test code
+}
 
-2. `M2 = { mC, sA, sC }`
+@Test
+public void test2() {
+    Service mockService = createBasicMockService();
+    when(mockService.getPriority()).thenReturn(1);
+    // different test code
+}
+```
 
-   ```java
-   MyService s = Mockito.mock(MyService.class);  // mC
-   when(s.doA("A")).thenReturn("someReturn");    // sA
-   when(s.doC("C")).thenReturn("cReturn");       // sC
-   ```
+### 2. @Before Method for Common Mock Creations
 
-3. `M3 = { mC, sD }`
+For tests that only create the same mocks without stubbing, we recommend moving creation to @Before:
 
-   ```java
-   MyService s = Mockito.mock(MyService.class);  // mC
-   when(s.doD("D")).thenReturn("dReturn");       // sD
-   ```
+**Before refactoring:**
+```java
+@Test
+public void test1() {
+    Service mockService = mock(Service.class);
+    Client mockClient = mock(Client.class);
+    // test code
+}
 
-4. `M4 = { mC, sB, sC }`
+@Test
+public void test2() {
+    Service mockService = mock(Service.class);
+    Client mockClient = mock(Client.class);
+    // different test code
+}
+```
 
-   ```java
-   MyService s = Mockito.mock(MyService.class);  // mC
-   when(s.doB("B")).thenReturn("bReturn");       // sB
-   when(s.doC("C")).thenReturn("cReturn");       // sC
-   ```
+**After refactoring:**
+```java
+private Service mockService;
+private Client mockClient;
 
-### 5.2. Frequent Sub-sequences
+@Before
+public void setup() {
+    mockService = mock(Service.class);
+    mockClient = mock(Client.class);
+}
 
-Imagine Apriori/FP-Growth yields:
+@Test
+public void test1() {
+    // test code using mockService and mockClient
+}
 
-- `E1 = { mC }`  
-  Covers `{M1, M2, M3, M4}`.  
-- `E2 = { mC, sA }`  
-  Covers `{M1, M2}`.  
-- `E3 = { mC, sB }`  
-  Covers `{M1, M4}`.  
-- `E4 = { mC, sC }`  
-  Covers `{M2, M4}`.  
-- `E5 = { mC, sD }`  
-  Covers `{M3}` only (so `|C(E5)|=1` for now).
-
-### 5.3. Step-by-Step Possible Run
-
-We sort them by `|Ej| * (|C(Ej)| - 1)`:
-
-- `E1`: length = 1, covers 4 → potential = `1 * (4 - 1) = 3`.  
-- `E2`: length = 2, covers 2 → potential = `2 * (2 - 1) = 2`.  
-- `E3`: length = 2, covers 2 → potential = `2`.  
-- `E4`: length = 2, covers 2 → potential = `2`.  
-- `E5`: length = 2, covers 1 → potential = `0`.
-
-1. **Assign M1**  
-   - Candidates: `E1, E2, E3`.  
-   - `E1=3`, `E2=2`, `E3=2`. Pick `E1`; now `E1` covers `{M1}`.  
-2. **Assign M2**  
-   - Candidates: `E1, E2, E4`. If `E1` is still 3, we pick `E1`; now `E1` covers `{M1, M2}`.  
-3. **Assign M3**  
-   - Candidates: `E1, E5`. `E1=3`, `E5=0`. Choose `E1`; now `E1` covers `{M1, M2, M3}`.  
-4. **Assign M4**  
-   - Candidates: `E1, E3, E4`. Possibly choose `E1` again; it covers `{M1, M2, M3, M4}`.
-
-So `E1` length=1 covers 4 sequences → actual lines saved = `1 * (4 - 1) = 3`. Others might cover none or remain with coverage=1. Total = 3.
-
-### 5.4. Another Run (With Different Choices)
-
-If we **randomly** pick `E2` for `M2` instead, or if we try to use `E3` and `E4` for `M4`, we might produce a higher total. This is why multiple runs can be beneficial.
-
----
-
-## 6. Conclusion
-
-By focusing on **partial overlaps**:
-
-1. We gather **mock sequences** from each test, even if they differ in some stubs.  
-2. **Apriori/FP-Growth** detects sub-sequences that appear in multiple tests (like “mock creation + stub(A)”).  
-3. We run a **greedy assignment** to see how best to group each mock sequence under a repeated sub-sequence, while acknowledging that leftover stubs can be done individually.  
-4. We handle tie situations **randomly**, allowing multiple runs to find better coverage.  
-5. We refactor out the most common overlapping lines into a helper method, thus **reducing duplication** while letting each test add the unique stubs it needs.
-
-This approach systematically identifies repeated fragments—whether fully identical or partially shared—and helps keep tests more maintainable and concise.
+@Test
+public void test2() {
+    // different test code using mockService and mockClient
+}
+```
