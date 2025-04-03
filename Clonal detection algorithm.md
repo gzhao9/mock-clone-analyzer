@@ -34,6 +34,18 @@ This approach reduces test maintenance costs and improves test readability.
 
 In each test method, we collect the mock creation and stubbing statements for every mock object and represent them as a mock sequence:
 
+
+For a more complex mock, the sequence might look like this:
+```java
+// Mock sequence: Mi = {s1, s2, ..., sk}
+MyService service = Mockito.mock(MyService.class); // Mock creation
+when(service.doA("A")).thenReturn("resultA");      // s1
+when(service.doB("B")).thenReturn("resultB");      // s2
+when(service.doC("C")).thenReturn("resultC");      // s3
+//....
+when(service.doD("D")).thenReturn("resultD");      // sk
+```
+
 ```text
 Mi = {s1, s2, ..., sk}
 ```
