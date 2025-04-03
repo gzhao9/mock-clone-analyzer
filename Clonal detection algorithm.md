@@ -358,3 +358,90 @@ public void test2() {
     // different test code using mockService and mockClient
 }
 ```
+
+### Output Example
+
+The provided JSON output demonstrates an example where three shared statements and one non-shared sequence are transformed into a structure where all four stub statements are shared. This transformation is achieved by abstracting the mock and stub statements into a generalized format, enabling reuse across different test cases. The example highlights the following key aspects:
+
+1. **Shared Statements**: These are the mock or stub statements that are common across multiple test cases. In this example, the shared statements include:
+  - `when(Directory<DemoService>.getConsumerUrl()).thenReturn(org.apache.dubbo.common.URL)`
+  - `when(Directory<DemoService>.getInterface()).thenReturn(Directory<DemoService>)`
+  - `when(Directory<DemoService>.getUrl()).thenReturn(org.apache.dubbo.common.URL)`
+
+2. **Non-Shared Sequence**: Initially, one sequence contains a unique stub statement:
+  - `when(Directory<DemoService>.list(org.apache.dubbo.rpc.RpcInvocation)).thenReturn(java.util.List<org.apache.dubbo.rpc.cluster.support.MockInvoker>)`
+
+3. **Transformation**: By abstracting the unique stub statement and integrating it into the shared structure, the output ensures that all four stub statements are now shared, improving maintainability and reducing redundancy in the test code.
+
+This example illustrates the process of optimizing test code by consolidating shared behaviors, which can be particularly useful in large-scale projects with extensive test suites.
+
+```json
+{
+"mockedClass": "Directory<DemoService>",
+"packageName": "org.apache.dubbo.rpc.cluster.support",
+"testCaseCount": 3,
+"sequenceCount": 6,
+"sharedStatementLineCount": 4,
+"locReduced": 20,
+"sharedStatements": [
+  "when(Directory<DemoService>.getConsumerUrl()).thenReturn(org.apache.dubbo.common.URL)",
+  "when(Directory<DemoService>.getInterface()).thenReturn(Directory<DemoService>)",
+  "when(Directory<DemoService>.getUrl()).thenReturn(org.apache.dubbo.common.URL)",
+  "when(Directory<DemoService>.list(org.apache.dubbo.rpc.RpcInvocation)).thenReturn(java.util.List<org.apache.dubbo.rpc.cluster.support.MockInvoker>)"
+],
+"sequences": [
+  {
+    "variableName": "dic",
+    "variableType": "Directory<DemoService>",
+    "mockedClass": "Directory<DemoService>",
+    "packageName": "org.apache.dubbo.rpc.cluster.support",
+    "filePath": "C:\\java tool\\Apache\\dubbo\\dubbo-cluster\\src\\test\\java\\org\\apache\\dubbo\\rpc\\cluster\\support\\BroadCastClusterInvokerTest.java",
+    "className": "BroadCastClusterInvokerTest",
+    "testMethodName": "testNormal",
+    "overlapLines": [],
+    "shareableMockLines": {
+      "44": "private Directory<DemoService> dic;",
+      "56": "dic = mock(Directory.class);",
+      "64": "given(dic.getUrl()).willReturn(url);",
+      "65": "given(dic.getConsumerUrl()).willReturn(url);",
+      "66": "given(dic.getInterface()).willReturn(DemoService.class);"
+    },
+    "testMockLines": {
+      "76": "given(dic.list(invocation)).willReturn(Arrays.asList(invoker1, invoker2, invoker3, invoker4));"
+    },
+    "abstractedStatement": {
+      "64": "when(Directory<DemoService>.getUrl()).thenReturn(org.apache.dubbo.common.URL)",
+      "65": "when(Directory<DemoService>.getConsumerUrl()).thenReturn(org.apache.dubbo.common.URL)",
+      "66": "when(Directory<DemoService>.getInterface()).thenReturn(Directory<DemoService>)",
+      "76": "when(Directory<DemoService>.list(org.apache.dubbo.rpc.RpcInvocation)).thenReturn(java.util.List<org.apache.dubbo.rpc.cluster.support.MockInvoker>)"
+    }
+  },
+  {
+    "variableName": "dic",
+    "variableType": "Directory<DemoService>",
+    "mockedClass": "Directory<DemoService>",
+    "packageName": "org.apache.dubbo.rpc.cluster.support",
+    "filePath": "C:\\java tool\\Apache\\dubbo\\dubbo-cluster\\src\\test\\java\\org\\apache\\dubbo\\rpc\\cluster\\support\\BroadCastClusterInvokerTest.java",
+    "className": "BroadCastClusterInvokerTest",
+    "testMethodName": "testEx",
+    "overlapLines": [],
+    "shareableMockLines": {
+      "44": "private Directory<DemoService> dic;",
+      "56": "dic = mock(Directory.class);",
+      "64": "given(dic.getUrl()).willReturn(url);",
+      "65": "given(dic.getConsumerUrl()).willReturn(url);",
+      "66": "given(dic.getInterface()).willReturn(DemoService.class);"
+    },
+    "testMockLines": {
+      "87": "given(dic.list(invocation)).willReturn(Arrays.asList(invoker1, invoker2, invoker3, invoker4));"
+    },
+    "abstractedStatement": {
+      "64": "when(Directory<DemoService>.getUrl()).thenReturn(org.apache.dubbo.common.URL)",
+      "65": "when(Directory<DemoService>.getConsumerUrl()).thenReturn(org.apache.dubbo.common.URL)",
+      "66": "when(Directory<DemoService>.getInterface()).thenReturn(Directory<DemoService>)",
+      "87": "when(Directory<DemoService>.list(org.apache.dubbo.rpc.RpcInvocation)).thenReturn(java.util.List<org.apache.dubbo.rpc.cluster.support.MockInvoker>)"
+    }
+    }
+]
+}
+```
