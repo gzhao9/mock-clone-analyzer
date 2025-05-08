@@ -365,9 +365,14 @@ This strategy minimizes redundant stubbing logic while preserving the clarity an
 
 We evaluated our clone detection algorithm on two major open-source Java projects:
 
-| Project | New Algorithm Instances | Original Algorithm Instances | Improvement |
-|---------|-------------------------|------------------------------|-------------|
-| Apache Dubbo | 126 | 57 | 121% |
-| Apache CloudStack | 1,374 | 447 | 207% |
+| Project            | Old MO Reduction | New MO Reduction | Old LOC Reduction | New LOC Reduction |
+|--------------------|------------------|------------------|-------------------|-------------------|
+| Dubbo              | 158              | 487              | 193               | 770               |
+| CloudStack         | 1,719            | 5,488            | 2,217             | 6,761             |
+| Druid              | 83               | 300              | 106               | 391               |
+| Spring-Security    | 203              | 2,720            | 211               | 2,891             |
+| Spring-Integration | 208              | 869              | 283               | 920               |
+| Kiota-Java         | 18               | 45               | 19                | 46                |
+
 
 The significant improvement in clone detection demonstrates the effectiveness of our refined approach in identifying more refactoring opportunities across diverse codebases.
