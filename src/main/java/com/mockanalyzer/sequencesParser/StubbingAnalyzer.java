@@ -150,10 +150,37 @@ public class StubbingAnalyzer {
                         // 提取参数类型
                         List<String> paramTypes = new ArrayList<>();
                         for (Expression param : stubMethod.getArguments()) {
-                            try {
-                                paramTypes.add(param.calculateResolvedType().describe());
-                            } catch (Exception e) {
-                                paramTypes.add(param.toString());
+                            boolean isMockitoMatcher = false;
+                            if (param.isMethodCallExpr()) {
+                                MethodCallExpr paramAsMethodCall = param.asMethodCallExpr();
+                                try {
+                                    // Attempt to resolve the method call
+                                    String qualifiedSignature = paramAsMethodCall.resolve().getQualifiedSignature();
+                                    // Check if the method belongs to Mockito's argument matchers packages
+                                    if (qualifiedSignature.startsWith("org.mockito.ArgumentMatchers.") ||
+                                        qualifiedSignature.startsWith("org.mockito.Matchers.")) { // Matchers is deprecated but might still be used
+                                        isMockitoMatcher = true;
+                                    }
+                                } catch (Exception e) {
+                                    // Resolution failed, fallback to name-based check or treat as non-matcher
+                                    // For robustness, we can still include a simplified name check as a fallback
+                                    String paramName = paramAsMethodCall.getNameAsString();
+                                    if (paramName.startsWith("any") || paramName.equals("eq") || paramName.equals("isA")) {
+                                        // A minimal set of common matchers if resolution fails
+                                        isMockitoMatcher = true;
+                                    }
+                                }
+                            }
+
+                            if (isMockitoMatcher) {
+                                paramTypes.add(param.toString()); // Use toString() for matchers
+                            } else {
+                                try {
+                                    paramTypes.add(param.calculateResolvedType().describe());
+                                } catch (Exception e) {
+                                    // Fallback if type resolution fails for non-matchers
+                                    paramTypes.add(param.toString());
+                                }
                             }
                         }
     

@@ -212,7 +212,9 @@ public class MockInfo {
             MockSequence seq = new MockSequence();
             seq.variableName = this.variableName;
             seq.variableType = this.variableType;
-            seq.mockedClass = this.mockedClass;
+            seq.mockedClass = (this.mockedClass == null || this.mockedClass.isEmpty() || "null".equals(this.mockedClass))
+                    ? this.variableType
+                    : this.mockedClass;            
             seq.packageName = this.classContext.packageName;
             seq.filePath = this.classContext.filePath;
             seq.className = this.classContext.className;

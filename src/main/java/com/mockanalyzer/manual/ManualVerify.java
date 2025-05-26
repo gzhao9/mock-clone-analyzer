@@ -33,8 +33,8 @@ public class ManualVerify {
 
         String projectName = "dubbo";
 
-        verifyOutputSequences("C:\\java tool\\Apache\\" + projectName,
-                "C:\\Users\\10590\\OneDrive - stevens.edu\\PHD\\2025 Spring\\mock clone detection\\mock-clone-analyzer\\Example Test File\\"
+        verifyOutputSequences("C:\\Java_projects\\Apache\\" + projectName,
+                "C:\\Users\\gzhao9\\OneDrive - stevens.edu\\PHD\\2025 Spring\\mock clone detection\\mock-clone-analyzer\\Example Test File\\"
                         + projectName + " clone.json",
                 false);
         // manualVerifyProcess();
@@ -43,16 +43,16 @@ public class ManualVerify {
 
     private static void manualVerifyProcess() throws Exception {
         String projectName = "dubbo";
-        analyzeWithParameters("C:\\java tool\\Apache\\" + projectName,
+        analyzeWithParameters("C:\\Java_projects\\Apache\\" + projectName,
                 "C:\\Users\\10590\\OneDrive - stevens.edu\\PHD\\2025 Spring\\mock clone detection\\mock-clone-analyzer\\Example Test File\\"
                         + projectName + ".json",
                 false, false);
     }
 
     private static void manualVerifySolver() {
-        Path projectRoot = Paths.get("C:\\java tool\\Spring\\spring-integration");
+        Path projectRoot = Paths.get("C:\\Java_projects\\Spring\\spring-integration");
         Path targetFile = Paths.get(
-                "C:\\java tool\\Spring\\spring-integration\\spring-integration-core\\src\\test\\java\\org\\springframework\\integration\\channel\\ExecutorChannelTests.java");
+                "C:\\Java_projects\\Spring\\spring-integration\\spring-integration-core\\src\\test\\java\\org\\springframework\\integration\\channel\\ExecutorChannelTests.java");
         int lineNumber = 180; // 替换成你想要分析的具体行号
 
         resolveStatement(projectRoot, targetFile, lineNumber, false);

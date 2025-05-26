@@ -63,6 +63,10 @@ public class MockAnalyzer {
                 try {
                     ResolvedType resolvedType = variable.getType().resolve();
                     mockInfo.mockedClass = resolvedType.describe();
+                    if (mockInfo.mockedClass == null) {
+                        mockInfo.mockedClass = mockInfo.variableType;
+                    }
+
                 } catch (UnsolvedSymbolException e) {
                     mockInfo.mockedClass = mockInfo.variableType;
                 }
