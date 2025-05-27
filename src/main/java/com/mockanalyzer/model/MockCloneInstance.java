@@ -11,6 +11,7 @@ public class MockCloneInstance {
     public int sequenceCount;
     public int sharedStatementLineCount;
     public int locReduced;
+    public int mockObjectCount; // abstractedStatements count
 
     public List<String> sharedStatements; // abstractedStatements that are shared
 

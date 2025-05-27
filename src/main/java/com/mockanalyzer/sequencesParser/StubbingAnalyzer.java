@@ -10,13 +10,15 @@ import java.util.Optional;
 
 import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration;
 import com.mockanalyzer.model.MockInfo;
 
 public class StubbingAnalyzer {
     // 从表达式中提取变量名，例如 mock 对象名
     public static String extractVariableName(Expression expr) {
-        if (expr == null) return null;
-    
+        if (expr == null)
+            return null;
+
         if (expr.isNameExpr()) {
             return expr.asNameExpr().getNameAsString();
         } else if (expr.isFieldAccessExpr()) {
@@ -24,10 +26,9 @@ public class StubbingAnalyzer {
         } else if (expr.isMethodCallExpr()) {
             return extractVariableName(expr.asMethodCallExpr().getScope().orElse(null));
         }
-    
+
         return null;
     }
-    
 
     // 遍历链式调用，找到 when() 或 given()：
     private static Optional<MethodCallExpr> findWhenOrGivenCall(MethodCallExpr call) {
@@ -50,7 +51,7 @@ public class StubbingAnalyzer {
     private static Optional<String> extractMockFromWhenOrGiven(MethodCallExpr whenOrGivenCall) {
         if (!whenOrGivenCall.getArguments().isEmpty()) {
             Expression arg = whenOrGivenCall.getArgument(0);
-    
+
             // case 1: when(mock.method())
             if (arg.isMethodCallExpr()) {
                 MethodCallExpr innerCall = arg.asMethodCallExpr();
@@ -58,15 +59,14 @@ public class StubbingAnalyzer {
                     return Optional.ofNullable(extractVariableName(innerCall.getScope().get()));
                 }
             }
-    
-            //  case 2: when(mock)
+
+            // case 2: when(mock)
             else {
                 return Optional.ofNullable(extractVariableName(arg));
             }
         }
         return Optional.empty();
     }
-    
 
     // 整合判断与提取
     public static Optional<String> getStubbingTargetVariable(Expression expr) {
@@ -115,38 +115,43 @@ public class StubbingAnalyzer {
 
     public static String abstractStubbingStatement(Expression expression, MockInfo mock) {
 
-        if (!expression.isMethodCallExpr()) return expression.toString();
-    
+        if (!expression.isMethodCallExpr())
+            return expression.toString();
+
         try {
             MethodCallExpr fullCall = expression.asMethodCallExpr();
             Deque<String> chain = new ArrayDeque<>();
-    
+
             // Step 1: 找到 when/given 调用
             Optional<MethodCallExpr> whenCallOpt = findWhenOrGivenCall(fullCall);
             MethodCallExpr current = fullCall;
-    
+
             // Step 2: 遍历链式结构
             while (true) {
                 String rawMethod = current.getNameAsString();
                 String methodName = normalizeMockitoMethodName(rawMethod);
                 StringBuilder builder = new StringBuilder();
                 builder.append(methodName).append("(");
-    
+
                 // 特别处理 when/given：抽象化为完整调用
                 if (methodName.equals("when") && current == whenCallOpt.orElse(null)) {
                     Expression whenArg = current.getArgument(0);
-    
+
                     if (whenArg.isMethodCallExpr()) {
                         MethodCallExpr stubMethod = whenArg.asMethodCallExpr();
-    
+
                         // 提取 mock 类型
                         String mockType = mock.mockedClass;
+                        if (mockType == null || "null".equals(mockType)) {
+                            mockType = mock.variableType != null ? mock.variableType : "java.lang.Object";
+                        }
                         if (stubMethod.getScope().isPresent()) {
                             try {
                                 mockType = stubMethod.getScope().get().calculateResolvedType().describe();
-                            } catch (Exception ignored) {}
+                            } catch (Exception ignored) {
+                            }
                         }
-    
+
                         // 提取参数类型
                         List<String> paramTypes = new ArrayList<>();
                         for (Expression param : stubMethod.getArguments()) {
@@ -158,14 +163,18 @@ public class StubbingAnalyzer {
                                     String qualifiedSignature = paramAsMethodCall.resolve().getQualifiedSignature();
                                     // Check if the method belongs to Mockito's argument matchers packages
                                     if (qualifiedSignature.startsWith("org.mockito.ArgumentMatchers.") ||
-                                        qualifiedSignature.startsWith("org.mockito.Matchers.")) { // Matchers is deprecated but might still be used
+                                            qualifiedSignature.startsWith("org.mockito.Matchers.")) { // Matchers is
+                                                                                                      // deprecated but
+                                                                                                      // might still be
+                                                                                                      // used
                                         isMockitoMatcher = true;
                                     }
                                 } catch (Exception e) {
                                     // Resolution failed, fallback to name-based check or treat as non-matcher
                                     // For robustness, we can still include a simplified name check as a fallback
                                     String paramName = paramAsMethodCall.getNameAsString();
-                                    if (paramName.startsWith("any") || paramName.equals("eq") || paramName.equals("isA")) {
+                                    if (paramName.startsWith("any") || paramName.equals("eq")
+                                            || paramName.equals("isA")) {
                                         // A minimal set of common matchers if resolution fails
                                         isMockitoMatcher = true;
                                     }
@@ -183,18 +192,18 @@ public class StubbingAnalyzer {
                                 }
                             }
                         }
-    
+
                         builder.append(mockType)
-                               .append(".")
-                               .append(stubMethod.getNameAsString())
-                               .append("(")
-                               .append(String.join(", ", paramTypes))
-                               .append(")");
+                                .append(".")
+                                .append(stubMethod.getNameAsString())
+                                .append("(")
+                                .append(String.join(", ", paramTypes))
+                                .append(")");
                     } else {
                         // fallback
-                        builder.append( mock.mockedClass);
+                        builder.append(mock.mockedClass);
                     }
-    
+
                 } else {
                     // 其他调用（如 thenReturn/doThrow），只解析参数类型
                     List<String> argTypes = new ArrayList<>();
@@ -202,26 +211,51 @@ public class StubbingAnalyzer {
                         try {
                             argTypes.add(arg.calculateResolvedType().describe());
                         } catch (Exception e) {
-                            argTypes.add( mock.mockedClass);
+                            String simpleType; // 兜底结果
+
+                            /* ---------- ① 尝试解析返回类型（MethodCallExpr 专用） ---------- */
+                            if (arg.isMethodCallExpr()) {
+                                try {
+                                    ResolvedMethodDeclaration r = arg.asMethodCallExpr().resolve(); // 解析失败直接跳过
+                                    simpleType = r.getReturnType().describe(); // 例如 io.netty.channel.ChannelFuture
+
+                                } catch (Exception ignored) {
+                                    simpleType = null; // 留给下一步
+                                }
+                            } else {
+                                /* ---------- ② 若不是方法调用，再退回 calculateResolvedType() ---------- */
+                                try {
+                                    simpleType = arg.calculateResolvedType().describe();
+                                } catch (Exception ignored) {
+                                    simpleType = null;
+                                }
+                            }
+
+                            /* ---------- ③ 最终仍失败，保留源码文本 ---------- */
+                            if (simpleType == null) {
+                                simpleType = arg.toString(); // 如 channel.newSucceededFuture()
+                            }
+
+                            argTypes.add(simpleType);
                         }
                     }
                     builder.append(String.join(", ", argTypes));
                 }
-    
+
                 builder.append(")");
                 chain.addFirst(builder.toString());
-    
+
                 if (current.getScope().isPresent() && current.getScope().get().isMethodCallExpr()) {
                     current = current.getScope().get().asMethodCallExpr();
                 } else {
                     break;
                 }
             }
-    
+
             return String.join(".", chain);
-    
+
         } catch (Exception e) {
             return expression.toString();
         }
-    }     
+    }
 }

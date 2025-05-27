@@ -27,14 +27,16 @@ public class MockCloneExporter {
         List<MockInfo> combinedResults = MockInfoExporter.analyzeProject(projectRoot, runCommand);
 
         // Step 2: Flatten all sequences
+        int mockId = 0;
         List<MockSequence> allSequences = new ArrayList<>();
         for (MockInfo mockInfo : combinedResults) {
+            mockInfo.mockObjectId = mockId++;
             allSequences.addAll(mockInfo.toMockSequences());
         }
 
         // Step 3: Detect Clones
         Map<String, List<MockCloneInstance>> cloneMap = new MockCloneDetector().detect(allSequences);
-
+        MockCloneResult cloneResult = new MockCloneResult(combinedResults, cloneMap);
         // Step 4: Write JSON
         Gson gson = new GsonBuilder()
                 .setPrettyPrinting()
@@ -43,9 +45,27 @@ public class MockCloneExporter {
 
         try (OutputStreamWriter writer = new OutputStreamWriter(
                 new FileOutputStream(outputPath), StandardCharsets.UTF_8)) {
-            gson.toJson(cloneMap, writer);
+            gson.toJson(cloneResult, writer);
         }
 
         System.out.println("Mock clone detection completed. Result -> " + outputPath);
+    }
+    private static class MockCloneResult{
+        private Map<String, List<MockCloneInstance>> detectedMockClones;
+        private List<MockInfo> detectedMockObjects;
+        public MockCloneResult() {
+            this.detectedMockObjects = new ArrayList<>();
+            this.detectedMockClones = new HashMap<>();
+        }
+        public MockCloneResult(List<MockInfo> detectedMockObjects, Map<String, List<MockCloneInstance>> detectedMockClones) {
+            this.detectedMockObjects = detectedMockObjects;
+            this.detectedMockClones = detectedMockClones;
+        }
+        public void setDetectedMockObjects(List<MockInfo> detectedMockObjects) {
+            this.detectedMockObjects = detectedMockObjects;
+        }
+        public void setDetectedMockClones(Map<String, List<MockCloneInstance>> detectedMockClones) {
+            this.detectedMockClones = detectedMockClones;
+        }
     }
 }

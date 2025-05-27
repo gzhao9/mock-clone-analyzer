@@ -2,6 +2,7 @@ package com.mockanalyzer.cloneDetector;
 
 import com.mockanalyzer.model.MockCloneInstance;
 import com.mockanalyzer.model.MockSequence;
+import com.mockanalyzer.model.StatementInfo;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,6 +19,10 @@ public class MockCloneDetector {
         for (MockSequence seq : allSequences) {
             String key = seq.mockedClass + "#" + seq.packageName;
             grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(seq);
+            // if (seq.packageName != null && seq.packageName.length() < 100 && seq.packageName.length() > 4) {
+            //     grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(seq);
+            // }
+            
         }
 
         // Step 2: Run detection per group, collect by mockedClass
@@ -95,36 +100,58 @@ public class MockCloneDetector {
             List<MockSequence> sameFile = e.getValue();
 
             // 如果同一个 filePath 下无 stub 的 mock < 2，不形成克隆
-            if (sameFile.size() < 2) {
-                continue;
+            while (sameFile.size() > 2) {
+
+                // 这里假设只需一个 CloneInstance，把同文件、同 mockedClass 的都合并
+                // 如果想要多次合并(eg. 先 2个,再 2个),可自行修改
+                MockCloneInstance instance = new MockCloneInstance();
+                instance.mockedClass = mockedClass;
+                instance.packageName = packageName;
+
+                // 这里假设 shareableStatements 只有 1 行 => "mock(...)"
+                // 或者可以从 first sequence 的 shareableMockLines 取
+                // 仅作示例:
+                instance.sharedStatements = new ArrayList<>();
+                instance.sequences = new ArrayList<>();
+
+                // testCaseCount
+                Set<String> testCases = new HashSet<>();
+                Set<Integer> mockIDs = new HashSet<>();
+                for (MockSequence seq : sameFile) {
+                    if (!testCases.contains(seq.testMethodName) && !mockIDs.contains(seq.mockObjectId)
+                            && !seq.isReuseableMock) {
+                        testCases.add(seq.testMethodName);
+                        mockIDs.add(seq.mockObjectId);
+                        instance.sequences.add(seq);
+                        for (int k : seq.rawStatementInfo.keySet()) {
+                            StatementInfo stmt = seq.rawStatementInfo.get(k);
+                            if (!stmt.type.equals("STUBBING") && !stmt.type.equals("VERIFICATION")
+                                    && stmt.isMockRelated) {
+                                seq.overlapLines.add(k);
+                                break; // 只取第一个相关语句
+                            }
+                        }
+                    }
+
+                }
+                instance.testCaseCount = testCases.size();
+
+                // 我们约定 locReduced = 1*(seqCount - 1), 具体可再改
+                instance.sharedStatementLineCount = 0;
+                instance.mockObjectCount = mockIDs.size();
+                instance.sequenceCount = instance.mockObjectCount;
+                instance.locReduced = (instance.sequenceCount - 1);
+                if (instance.mockObjectCount > 1) {
+                    results.add(instance);
+                }
+                int oldSize = sameFile.size();
+                sameFile = sameFile.stream()
+                        .filter(seq -> !instance.sequences.contains(seq)) // 只保留非可重用的 mock
+                        .collect(Collectors.toList());
+                if (sameFile.size() == oldSize) {
+                    break;
+                }
             }
-
-            // 这里假设只需一个 CloneInstance，把同文件、同 mockedClass 的都合并
-            // 如果想要多次合并(eg. 先 2个,再 2个),可自行修改
-            MockCloneInstance instance = new MockCloneInstance();
-            instance.mockedClass = mockedClass;
-            instance.packageName = packageName;
-
-            // 这里假设 shareableStatements 只有 1 行 => "mock(...)"
-            // 或者可以从 first sequence 的 shareableMockLines 取
-            // 仅作示例:
-            instance.sharedStatements = new ArrayList<>();
-            instance.sequenceCount = sameFile.size();
-
-            // testCaseCount
-            Set<String> testCases = new HashSet<>();
-            for (MockSequence seq : sameFile) {
-                testCases.add(seq.testMethodName + "::" + seq.className);
-            }
-            instance.testCaseCount = testCases.size();
-
-            // 我们约定 locReduced = 1*(seqCount - 1), 具体可再改
-            instance.sharedStatementLineCount = 0;
-            instance.locReduced = (instance.sequenceCount - 1);
-
-            instance.sequences = sameFile;
-
-            results.add(instance);
         }
 
         return results;

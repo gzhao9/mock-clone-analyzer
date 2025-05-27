@@ -12,6 +12,7 @@ import java.util.Map;
  * Mainly used for outputting a more readable structure and saving abstracted information.
  */
 public class MockSequence {
+    public int mockObjectId;
 
     /**
      * Mock 的变量名，例如 "invoker"
@@ -30,7 +31,8 @@ public class MockSequence {
     public String packageName;
     public String filePath;
     public String className;
-    public String testMethodName;
+    public String testMethodName;    
+    public boolean isReuseableMock = false;
 
     public List<Integer> overlapLines = new ArrayList<>();
 
@@ -64,30 +66,4 @@ public class MockSequence {
      * Print the mock sequence in a readable format.
      * @return the formatted mock sequence
      */
-    public String formatMockSequence() {
-        StringBuilder sb = new StringBuilder();
-
-        sb.append("======================================\n");
-        sb.append("[Mock: ").append(this.variableName).append("]\n");
-        sb.append("Class: ").append(this.className).append("\n");
-        sb.append("File: ").append(this.filePath).append("\n\n");
-
-        if (!this.shareableMockLines.isEmpty()) {
-            sb.append("Shared Lines:\n");
-            for (Map.Entry<Integer, String> entry : this.shareableMockLines.entrySet()) {
-                sb.append(String.format("  [%d] %s\n", entry.getKey(), entry.getValue()));
-            }
-            sb.append("\n");
-        }
-
-        if (!this.testMockLines.isEmpty()) {
-            sb.append("Test Case: ").append(this.testMethodName).append("\n");
-            for (Map.Entry<Integer, String> entry : this.testMockLines.entrySet()) {
-                sb.append(String.format("  [%d] %s\n", entry.getKey(), entry.getValue()));
-            }
-            sb.append("\n");
-        }
-
-        return sb.toString();
-    }
 }

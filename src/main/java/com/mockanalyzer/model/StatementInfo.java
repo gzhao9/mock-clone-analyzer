@@ -22,6 +22,7 @@ public class StatementInfo {
     public String locate = "";
     public String abstractedStatement = "";
     public boolean isMockRelated = false;
+    public boolean isShareable = false; // 是否可共享的语句
 
     // 其他字段如 locationContext
     public LocationContext locationContext = new LocationContext();

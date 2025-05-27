@@ -2,6 +2,7 @@ package com.mockanalyzer.cloneDetector;
 
 import com.mockanalyzer.model.MockCloneInstance;
 import com.mockanalyzer.model.MockSequence;
+import com.mockanalyzer.model.StatementInfo;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -122,18 +123,44 @@ public class MockCloneMiner {
             Set<Integer> seqIndices = entry.getValue();
 
             MockCloneInstance instance = new MockCloneInstance();
+            instance.sequences = seqIndices.stream().map(group::get).collect(Collectors.toList());
             instance.mockedClass = mockedClass;
             instance.packageName = packageName;
+
             instance.sharedStatements = new ArrayList<>(sharedStatements);
             instance.sequenceCount = seqIndices.size();
             instance.testCaseCount = (int) seqIndices.stream()
                     .map(idx -> group.get(idx).testMethodName + "::" + group.get(idx).className)
                     .distinct().count();
             instance.sharedStatementLineCount = sharedStatements.size();
-            instance.locReduced = sharedStatements.size() * (seqIndices.size() - 1);
-            instance.sequences = seqIndices.stream().map(group::get).collect(Collectors.toList());
+            instance.locReduced = 0;
 
-            results.add(instance);
+            ArrayList<Integer> mockObjectIds = new ArrayList<>();
+            for (MockSequence seq : instance.sequences) {
+                if (!mockObjectIds.contains(seq.mockObjectId)) {
+                    mockObjectIds.add(seq.mockObjectId);
+                }
+                if (seq.isReuseableMock) {
+                    // 如果是可重用的 Mock，则让loc减少量-1，因为creation已经被reduced了，不能重复计算。
+                    // If it is a reusable mock, reduce locReduced by 1 because the creation has already been reduced.
+                    instance.locReduced -= 1;
+                }
+                // 计算每个序列的 LOC 减少量    
+                for (Integer line : seq.rawStatementInfo.keySet()) {
+                    StatementInfo stmt = seq.rawStatementInfo.get(line);
+                    String abststmt = stmt.abstractedStatement;
+                    if (sharedStatements.contains(abststmt) && !stmt.isShareable) {
+                        instance.locReduced++;
+                        seq.overlapLines.add(line);
+                    }
+
+                }
+            }
+            instance.mockObjectCount = mockObjectIds.size();
+            if (instance.mockObjectCount > 1) {
+                // 只添加 mock 对象数量大于 1 的实例
+                results.add(instance);
+            }
         }
 
         return results;

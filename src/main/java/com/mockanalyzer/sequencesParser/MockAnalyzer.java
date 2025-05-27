@@ -63,12 +63,8 @@ public class MockAnalyzer {
                 try {
                     ResolvedType resolvedType = variable.getType().resolve();
                     mockInfo.mockedClass = resolvedType.describe();
-                    if (mockInfo.mockedClass == null) {
-                        mockInfo.mockedClass = mockInfo.variableType;
-                    }
-
                 } catch (UnsolvedSymbolException e) {
-                    mockInfo.mockedClass = mockInfo.variableType;
+                    mockInfo.mockedClass = variable.getType().asString();
                 }
 
                 mockInfo.classContext.packageName = this.packageName;
@@ -141,6 +137,16 @@ public class MockAnalyzer {
                                 MockInfo mockInfo = new MockInfo();
                                 mockInfo.variableName = variable.getNameAsString();
                                 mockInfo.variableType = variable.getType().asString();
+                                mockInfo.classContext.packageName = this.packageName;
+
+                                // === 新增：为方法内局部 mock 解析 mockedClass ===
+                                try {
+                                    ResolvedType resolvedType = variable.getType().resolve();
+                                    mockInfo.mockedClass = resolvedType.describe();
+                                } catch (UnsolvedSymbolException e) {
+                                    // 退化到变量声明的类型，保证不是 null
+                                    mockInfo.mockedClass = mockInfo.variableType;
+                                }
 
                                 if (variable.getInitializer().isPresent()) {
                                     var initializer = variable.getInitializer().get();

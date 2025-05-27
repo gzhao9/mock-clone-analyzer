@@ -8,6 +8,7 @@ import java.util.*;
  */
 
 public class MockInfo {
+    public int mockObjectId;
     public String variableName;
     public String variableType;
     public String mockedClass;
@@ -37,7 +38,7 @@ public class MockInfo {
             }
         };
 
-        boolean isGlobalField = false;
+        this.isReuseableMock = false;
 
         for (StatementInfo stmt : statements) {
 
@@ -55,7 +56,7 @@ public class MockInfo {
                     || type.equals("FIELD_SPY_CREATION")
                     || type.equals("FIELD_MOCK_CREATION");
             if (isFieldOperation)
-                isGlobalField = true;
+                this.isReuseableMock = true;
 
             // ===== 分类处理逻辑 =====
             switch (type) {
@@ -68,7 +69,7 @@ public class MockInfo {
                 case "ASSIGNMENT_SPY":
                 case "METHOD_MOCK_CREATION":
                 case "METHOD_SPY_CREATION":
-                    handleCreation(categoryMap.get("creation"), stmt, isGlobalField);
+                    handleCreation(categoryMap.get("creation"), stmt, this.isReuseableMock);
                     break;
 
                 case "STUBBING":
@@ -106,6 +107,7 @@ public class MockInfo {
             case "ASSIGNMENT_SPY":
                 if (stmt.locate.equals("@Before")) {
                     key = "Global Init in @Before";
+                    this.isReuseableMock = true;
                 } else {
                     key = isGlobalField ? String.format("Lazy-init via %s", stmt.locate)
                             : String.format("Local Assignment in %s", stmt.locate);
@@ -210,14 +212,14 @@ public class MockInfo {
 
             // 创建一个新的 MockSequences
             MockSequence seq = new MockSequence();
+            seq.mockObjectId = this.mockObjectId;
             seq.variableName = this.variableName;
             seq.variableType = this.variableType;
-            seq.mockedClass = (this.mockedClass == null || this.mockedClass.isEmpty() || "null".equals(this.mockedClass))
-                    ? this.variableType
-                    : this.mockedClass;            
+            seq.mockedClass =  this.mockedClass;            
             seq.packageName = this.classContext.packageName;
             seq.filePath = this.classContext.filePath;
             seq.className = this.classContext.className;
+            seq.isReuseableMock = this.isReuseableMock;
             seq.testMethodName = testMethodName;
 
             // 3.1) 先处理 shareableList
@@ -249,6 +251,7 @@ public class MockInfo {
      */
     private void addToMockSequences(MockSequence seq, StatementInfo stmt) {
         boolean isShareable = isShareableLocate(stmt.locate);
+        stmt.isShareable = isShareable;
         Map<Integer, String> linesMap = isShareable ? seq.shareableMockLines : seq.testMockLines;
 
         linesMap.put(stmt.line, stmt.code);
