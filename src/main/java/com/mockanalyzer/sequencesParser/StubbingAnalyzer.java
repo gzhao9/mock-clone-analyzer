@@ -145,12 +145,25 @@ public class StubbingAnalyzer {
                         if (mockType == null || "null".equals(mockType)) {
                             mockType = mock.variableType != null ? mock.variableType : "java.lang.Object";
                         }
-                        if (stubMethod.getScope().isPresent()) {
+                        // if (stubMethod.getScope().isPresent()) {
+                        // try {
+                        // mockType = stubMethod.getScope().get().calculateResolvedType().describe();
+                        // } catch (Exception ignored) {
+                        // }
+                        // }
+                        // ---------- 修正：向上追溯到链式调用的根部 ----------
+                        Expression rootScope = stubMethod.getScope().orElse(null);
+                        while (rootScope != null && rootScope.isMethodCallExpr()) {
+                            rootScope = rootScope.asMethodCallExpr().getScope().orElse(null);
+                        }
+                        if (rootScope != null) {
                             try {
-                                mockType = stubMethod.getScope().get().calculateResolvedType().describe();
+                                mockType = rootScope.calculateResolvedType().describe(); // 真正的 mock 对象类型
                             } catch (Exception ignored) {
+                                // 保持原值
                             }
                         }
+                        // ---------- 结束修正 ----------
 
                         // 提取参数类型
                         List<String> paramTypes = new ArrayList<>();
@@ -192,10 +205,18 @@ public class StubbingAnalyzer {
                                 }
                             }
                         }
+                        // 2) 从 rootScope 到原 stubMethod 收集完整方法链
+                        StringBuilder methodCallChain = new StringBuilder();
+                        MethodCallExpr cur = stubMethod;
+                        methodCallChain.insert(0, cur.getNameAsString()); // 先放最末方法
+                        while (cur.getScope().isPresent() && cur.getScope().get().isMethodCallExpr()) {
+                            cur = cur.getScope().get().asMethodCallExpr();
+                            methodCallChain.insert(0, cur.getNameAsString() + ".");
+                        }
 
                         builder.append(mockType)
                                 .append(".")
-                                .append(stubMethod.getNameAsString())
+                                .append(methodCallChain)
                                 .append("(")
                                 .append(String.join(", ", paramTypes))
                                 .append(")");
