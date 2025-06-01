@@ -209,6 +209,10 @@ public class MockInfo {
         for (Map.Entry<String, List<StatementInfo>> entry : testCaseMap.entrySet()) {
             String testMethodName = entry.getKey();
             List<StatementInfo> testStmts = entry.getValue();
+            String testMethodRawCode = "";
+            if (!testStmts.isEmpty() && testStmts.get(0).locationContext != null) {
+                testMethodRawCode = testStmts.get(0).locationContext.methodRawCode;
+            }
 
             // 创建一个新的 MockSequences
             MockSequence seq = new MockSequence();
@@ -221,6 +225,7 @@ public class MockInfo {
             seq.className = this.classContext.className;
             seq.isReuseableMock = this.isReuseableMock;
             seq.testMethodName = testMethodName;
+            seq.testMethodRawCode = testMethodRawCode;
 
             // 3.1) 先处理 shareableList
             for (StatementInfo s : shareableList) {

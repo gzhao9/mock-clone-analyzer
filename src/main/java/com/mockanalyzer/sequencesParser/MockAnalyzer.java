@@ -115,6 +115,7 @@ public class MockAnalyzer {
         clazz.getMethods().forEach(method -> {
             String methodName = method.getNameAsString();
             List<String> methodAnnotations = new ArrayList<>();
+            String methodRawCode = method.toString();
             method.getAnnotations().forEach(annotation -> methodAnnotations.add(annotation.getNameAsString()));
 
             List<MockInfo> methodVariables = new ArrayList<>();
@@ -126,6 +127,7 @@ public class MockAnalyzer {
                     statementInfo.line = statement.getBegin().map(pos -> pos.line).orElse(-1);
                     statementInfo.locationContext.methodName = methodName;
                     statementInfo.locationContext.methodAnnotations = methodAnnotations;
+                    statementInfo.locationContext.methodRawCode = methodRawCode;
 
                     // Analyze the statement
                     if (statement.isExpressionStmt()) {

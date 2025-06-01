@@ -30,6 +30,7 @@ public class StatementInfo {
     public static class LocationContext {
         public String methodName;
         public List<String> methodAnnotations;
+        public String methodRawCode;
         // Getter & Setter
     }
     public StatementInfo copy() {
@@ -42,6 +43,7 @@ public class StatementInfo {
 
         copy.locationContext.methodName = this.locationContext.methodName;
         copy.locationContext.methodAnnotations = new ArrayList<>(this.locationContext.methodAnnotations);
+        copy.locationContext.methodRawCode = this.locationContext.methodRawCode;
 
         return copy;
     }

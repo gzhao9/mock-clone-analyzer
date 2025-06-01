@@ -35,6 +35,7 @@ public class MockSequence {
     public boolean isReuseableMock = false;
 
     public List<Integer> overlapLines = new ArrayList<>();
+    public String testMethodRawCode = "";
 
     /**
      * 在该类中，与此 Mock 相关的“共享语句”列表

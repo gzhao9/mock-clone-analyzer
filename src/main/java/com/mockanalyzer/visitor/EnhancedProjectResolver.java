@@ -22,11 +22,11 @@ public class EnhancedProjectResolver {
 
         if (isMaven) {
             if (runCommand) {
-                System.out.println("[INFO] Maven 项目，执行 mvn package...");
-                runCommand("mvn clean package -DskipTests", projectRoot);
+                // System.out.println("[INFO] Maven 项目，执行 mvn package...");
+                // runCommand("mvn clean package -DskipTests -DfailOnError=false", projectRoot);
 
                 System.out.println("[INFO] 添加依赖到libs，执行 mvn dependency:copy-dependencies...");
-                runCommand("mvn dependency:copy-dependencies -DincludeScope=test -DoutputDirectory=libs",
+                runCommand("mvn --fail-never  test-compile dependency:copy-dependencies -DincludeScope=test -DoutputDirectory=libs -Daggregate ",
                         projectRoot);
             }
 
@@ -34,7 +34,7 @@ public class EnhancedProjectResolver {
             combinedSolver.add(new ReflectionTypeSolver());
 
             addAllModuleLibs(projectRoot, combinedSolver);
-            return combinedSolver;
+            return combinedSolver; 
 
         }
         if (isGradle) {
