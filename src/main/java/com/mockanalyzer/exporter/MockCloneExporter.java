@@ -25,18 +25,24 @@ public class MockCloneExporter {
     public static void exportClones(Path projectRoot, String outputPath, boolean runCommand) throws Exception {
         // Step 1: Analyze
         List<MockInfo> combinedResults = MockInfoExporter.analyzeProject(projectRoot, runCommand);
+        List<MockInfo> fixedMockInfos = new ArrayList<>();
 
         // Step 2: Flatten all sequences
         int mockId = 0;
         List<MockSequence> allSequences = new ArrayList<>();
         for (MockInfo mockInfo : combinedResults) {
-            mockInfo.mockObjectId = mockId++;
-            allSequences.addAll(mockInfo.toMockSequences());
+            if (!mockInfo.isSpy() && !mockInfo.isGlobalFinal()) {                
+                mockInfo.rawMockObjectId = mockId++;
+                mockInfo.mockRole = "mock";
+                fixedMockInfos.add(mockInfo);
+                allSequences.addAll(mockInfo.toMockSequences());
+                continue; // Skip empty mock info
+            }
         }
 
         // Step 3: Detect Clones
         Map<String, List<MockCloneInstance>> cloneMap = new MockCloneDetector().detect(allSequences);
-        MockCloneResult cloneResult = new MockCloneResult(combinedResults, cloneMap);
+        MockCloneResult cloneResult = new MockCloneResult(fixedMockInfos, cloneMap);
         // Step 4: Write JSON
         Gson gson = new GsonBuilder()
                 .setPrettyPrinting()

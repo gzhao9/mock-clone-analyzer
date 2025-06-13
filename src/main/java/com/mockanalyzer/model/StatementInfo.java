@@ -33,6 +33,21 @@ public class StatementInfo {
         public String methodRawCode;
         // Getter & Setter
     }
+    public boolean isEqual(StatementInfo other) {
+        if (other == null) {
+            return false;
+        }
+        return Objects.equals(this.code, other.code)
+            && this.line == other.line
+            && Objects.equals(this.type, other.type)
+            && Objects.equals(this.locate, other.locate)
+            && Objects.equals(this.abstractedStatement, other.abstractedStatement)
+            && this.isMockRelated == other.isMockRelated
+            && this.isShareable == other.isShareable
+            && Objects.equals(this.locationContext.methodName, other.locationContext.methodName)
+            && Objects.equals(this.locationContext.methodAnnotations, other.locationContext.methodAnnotations)
+            && Objects.equals(this.locationContext.methodRawCode, other.locationContext.methodRawCode);
+    }
     public StatementInfo copy() {
         StatementInfo copy = new StatementInfo();
         copy.code = this.code;

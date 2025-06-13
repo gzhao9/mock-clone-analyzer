@@ -22,8 +22,8 @@ public class EnhancedProjectResolver {
 
         if (isMaven) {
             if (runCommand) {
-                // System.out.println("[INFO] Maven 项目，执行 mvn package...");
-                // runCommand("mvn clean package -DskipTests -DfailOnError=false", projectRoot);
+                System.out.println("[INFO] Maven 项目，执行 mvn package...");
+                runCommand("mvn clean package -DskipTests -DfailOnError=false -fn", projectRoot);
 
                 System.out.println("[INFO] 添加依赖到libs，执行 mvn dependency:copy-dependencies...");
                 runCommand("mvn --fail-never  test-compile dependency:copy-dependencies -DincludeScope=test -DoutputDirectory=libs -Daggregate ",
@@ -38,11 +38,12 @@ public class EnhancedProjectResolver {
 
         }
         if (isGradle) {
+            ensureGradleCopyLibsTask(projectRoot);
             if (runCommand) {
                 System.out.println("[INFO] 执行 gradlew assemble...");
                 runCommand("gradlew.bat assemble -x test --continue", projectRoot);
 
-                ensureGradleCopyLibsTask(projectRoot);
+                // ensureGradleCopyLibsTask(projectRoot);
                 runCommand("gradlew.bat copyTestLibs", projectRoot);
             }
             CombinedTypeSolver combinedSolver = new CombinedTypeSolver();

@@ -7,12 +7,13 @@ import com.mockanalyzer.exporter.MockCloneExporter;
 
 public class ManualVerify {
     public static void main(String[] args) throws Exception {
+        String community = "Spring";
 
-        String projectName = "dubbo";
+        String projectName = "spring-integration";
 
-        Path projectRoot = Paths.get("C:\\Java_projects\\Apache\\" + projectName);
-        String outputPath = "C:\\Users\\gzhao9\\OneDrive - stevens.edu\\PHD\\2025 Spring\\mock clone detection\\mock-clone-analyzer\\Example Test File\\" + projectName + " clone.json";
-        boolean runCommand = false;
+        Path projectRoot = Paths.get("C:\\Java_projects\\"+community+"\\" + projectName);
+        String outputPath = "C:\\Users\\10590\\OneDrive - stevens.edu\\PHD\\2025 Spring\\mock clone detection\\mock-clone-analyzer\\Example Test File\\" + projectName + " clone.json";
+        boolean runCommand = true; // Set to true if you want to re-run maven/gradle build
 
         MockCloneExporter.exportClones(projectRoot, outputPath, runCommand);
 

@@ -48,8 +48,11 @@ public class MockAnalyzer {
         for (MockInfo mockInfo : globalVariables) {
             boolean hasMockUsage = mockInfo.statements.stream().anyMatch(stmt -> stmt.isMockRelated);
             if (hasMockUsage) {
-                mockInfo.checkmockPattern();
-                finalMocks.add(mockInfo);
+                boolean exists = finalMocks.stream().anyMatch(existing -> existing.isEqual(mockInfo));
+                if (!exists) {
+                    mockInfo.checkmockPattern();
+                    finalMocks.add(mockInfo);
+                }
             }
         }
     }
@@ -233,8 +236,11 @@ public class MockAnalyzer {
             for (MockInfo mockInfo : methodVariables) {
                 boolean hasMockUsage = mockInfo.statements.stream().anyMatch(stmt -> stmt.isMockRelated);
                 if (hasMockUsage) {
-                    mockInfo.checkmockPattern();
-                    finalMocks.add(mockInfo);
+                    boolean exists = finalMocks.stream().anyMatch(existing -> existing.isEqual(mockInfo));
+                    if (!exists) {
+                        mockInfo.checkmockPattern();
+                        finalMocks.add(mockInfo);
+                    }
                 }
             }
 

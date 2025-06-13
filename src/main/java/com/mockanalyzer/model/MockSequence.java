@@ -13,6 +13,7 @@ import java.util.Map;
  */
 public class MockSequence {
     public int mockObjectId;
+    public String mockRole;
 
     /**
      * Mock 的变量名，例如 "invoker"

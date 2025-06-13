@@ -8,12 +8,14 @@ import java.util.*;
  */
 
 public class MockInfo {
-    public int mockObjectId;
+    public int rawMockObjectId;
     public String variableName;
     public String variableType;
     public String mockedClass;
     public boolean isReuseableMock = false;
     public String mockPattern = "";
+    // Indicates whether this is a mock or a spy. Possible values: "mock", "spy"
+    public String mockRole = "";
 
     // 类上下文
     // ClassContext
@@ -83,6 +85,15 @@ public class MockInfo {
         }
 
         this.mockPattern = formatPatternOutput(categoryMap);
+        this.mockRole = isSpy() ? "spy" : "mock";
+    }
+    public boolean isSpy() {
+        for (StatementInfo stmt : statements) {
+            if (stmt.type != null && stmt.type.toLowerCase().contains("mock")) {
+            return false;
+            }
+        }
+        return true;
     }
 
     private void handleCreation(
@@ -216,7 +227,8 @@ public class MockInfo {
 
             // 创建一个新的 MockSequences
             MockSequence seq = new MockSequence();
-            seq.mockObjectId = this.mockObjectId;
+            seq.mockRole = this.mockRole;
+            seq.mockObjectId = this.rawMockObjectId;
             seq.variableName = this.variableName;
             seq.variableType = this.variableType;
             seq.mockedClass =  this.mockedClass;            
@@ -267,4 +279,41 @@ public class MockInfo {
             seq.abstractedStatement.put(stmt.line, stmt.abstractedStatement);
         }
     }
+    public boolean isEqual(MockInfo other) {
+        if (other == null) return false;
+        if (this == other) return true;
+
+        boolean basicEqual = Objects.equals(this.variableName, other.variableName)
+                && Objects.equals(this.variableType, other.variableType)
+                && Objects.equals(this.mockedClass, other.mockedClass)
+                && this.isReuseableMock == other.isReuseableMock
+                && Objects.equals(this.mockRole, other.mockRole)
+                && Objects.equals(this.classContext.packageName, other.classContext.packageName)
+                && Objects.equals(this.classContext.filePath, other.classContext.filePath)
+                && Objects.equals(this.classContext.className, other.classContext.className);
+
+        if (!basicEqual) return false;
+
+        if (this.statements.size() != other.statements.size()) return false;
+        for (int i = 0; i < this.statements.size(); i++) {
+            StatementInfo s1 = this.statements.get(i);
+            StatementInfo s2 = other.statements.get(i);
+            if (s1 == null && s2 == null) continue;
+            if (s1 == null || s2 == null) return false;
+            if (!s1.isEqual(s2)) return false;
+        }
+        return true;
+    }
+    public boolean isGlobalFinal() {
+        for (StatementInfo stmt : statements) {
+            if (stmt.code != null 
+                && stmt.code.contains("final") 
+                && stmt.locationContext != null 
+                && "FieldDeclaration".equals(stmt.locationContext.methodName)) {
+                return true;
+            }
+        }
+        return false; // 这里可以根据实际情况判断是否为全局变量
+    }
+
 }
